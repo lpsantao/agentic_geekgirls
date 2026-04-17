@@ -143,8 +143,8 @@ graph LR
 ## Getting Started
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME
-cd YOUR_REPO_NAME
+git clone https://github.com/lpsantao/agentic_geekgirls.git
+cd agentic_geekgirls
 pip install -r requirements.txt
 ```
 
