@@ -17,7 +17,11 @@ from google.genai import types
 from dotenv import load_dotenv
 load_dotenv()
 
+# APP_NAME groups all sessions and runs for this application.
 APP_NAME = "financial_guardrails"
+
+# USER_ID identifies the person interacting with the agent.
+USER_ID = "medtiles"
 
 BLOCKED_RESPONSE = (
     "I'm sorry, I can't help with that. I'm designed to provide general financial "
@@ -38,8 +42,9 @@ Respond with exactly one word: SAFE or BLOCKED."""
 
 def guardrail(callback_context: CallbackContext, llm_request: LlmRequest) -> LlmResponse | None:
     """
-    before_model_callback: runs a safety check on the user message.
-    Returns a blocked LlmResponse to skip the main model, or None to proceed.
+    before_model_callback: runs a safety check on the user message BEFORE the main agent.
+    - Return an LlmResponse to short-circuit the agent (blocked message shown instead).
+    - Return None to let the request through to the main model unchanged.
     """
     # Extract the latest user message from the request
     user_text = ""
@@ -90,10 +95,12 @@ financial_advisor = LlmAgent(
 
 
 async def chat(user_input: str):
+    # Each call to chat() creates a fresh session — no memory across calls.
+    # In a real chatbot you would reuse the session_id to maintain conversation history.
     session_service = InMemorySessionService()
     session_id = str(uuid.uuid4())
     await session_service.create_session(
-        app_name=APP_NAME, user_id="user", session_id=session_id
+        app_name=APP_NAME, user_id=USER_ID, session_id=session_id
     )
 
     runner = Runner(
@@ -102,7 +109,7 @@ async def chat(user_input: str):
 
     print(f"\nUser: {user_input}")
     async for event in runner.run_async(
-        user_id="user",
+        user_id=USER_ID,
         session_id=session_id,
         new_message=types.Content(role="user", parts=[types.Part(text=user_input)]),
     ):
