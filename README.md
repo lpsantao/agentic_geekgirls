@@ -9,7 +9,7 @@ Based on [*Agentic Design Patterns: A Hands-On Guide to Building Intelligent Sys
 
 ## Implemented Patterns
 
-Each pattern is available in two frameworks — Google ADK and LangGraph — so you can compare approaches side by side.
+Each pattern is available in two frameworks (Google ADK and LangGraph) so you can compare approaches side by side.
 
 | Pattern | Google ADK | LangGraph |
 |---|---|---|
@@ -190,6 +190,6 @@ The `multi_agent.py` examples send real emails via the Gmail API and require a o
 
 ## About the Workshop
 
-This workshop explores the shift from single-prompt generative AI to agentic systems — covering the key patterns used in modern AI products through guided examples and a collaborative design exercise.
+This workshop explores the shift from single-prompt generative AI to agentic systems, covering the key patterns used in modern AI products through guided examples and a collaborative design exercise.
 
 **Presented by:** Liliana Antão · [Medtiles](https://med.tiles-ai.com) · [LinkedIn](https://linkedin.com/in/lilianaantao)
