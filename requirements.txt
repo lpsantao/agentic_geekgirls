@@ -1,0 +1,7 @@
+google-adk==1.28.0
+langchain==1.2.15
+langchain-google-genai==4.2.2
+langchain-openai==1.1.13
+langgraph==1.1.6
+litellm==1.83.0
+python-dotenv==1.2.2
