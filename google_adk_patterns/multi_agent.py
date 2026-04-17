@@ -22,7 +22,11 @@ from google.genai import types
 from dotenv import load_dotenv
 load_dotenv()
 
+# APP_NAME groups all sessions and runs for this application.
 APP_NAME = "meeting_followup"
+
+# USER_ID identifies the person interacting with the agent.
+USER_ID = "medtiles"
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 
@@ -62,9 +66,13 @@ def send_gmail(to: str, subject: str, body: str) -> str:
         return f"Gmail error: {e}"
 
 
+# Wrap the Python function so ADK can call it as a tool.
+# ADK auto-generates the tool schema from the function signature and docstring.
 gmail_tool = FunctionTool(send_gmail)
 
 # --- Agent 1: Summariser ---
+# output_key="summary" saves the result into session state.
+# Downstream agents reference it with {summary} in their instructions.
 summariser = LlmAgent(
     name="SummaryAgent",
     model="gemini-2.0-flash",
@@ -108,6 +116,8 @@ email_composer = LlmAgent(
 )
 
 # --- Pipeline: run all three agents in sequence ---
+# SequentialAgent runs sub_agents left-to-right.
+# Each agent can read any key in session state set by a previous agent.
 pipeline = SequentialAgent(
     name="MeetingFollowupPipeline",
     sub_agents=[summariser, action_extractor, email_composer],
@@ -115,12 +125,16 @@ pipeline = SequentialAgent(
 
 
 async def run(raw_notes: str, recipient_email: str):
+    # InMemorySessionService stores all sessions in RAM — ideal for demos.
     session_service = InMemorySessionService()
+    # Unique session ID per run so conversations don't collide.
     session_id = str(uuid.uuid4())
 
+    # Pre-populate session state so agents can reference {raw_notes} and
+    # {recipient_email} directly in their instructions without extra tool calls.
     await session_service.create_session(
         app_name=APP_NAME,
-        user_id="user",
+        user_id=USER_ID,
         session_id=session_id,
         state={
             "raw_notes": raw_notes,
@@ -128,20 +142,24 @@ async def run(raw_notes: str, recipient_email: str):
         },
     )
 
+    # Runner wires together the agent, session service, and app context.
     runner = Runner(agent=pipeline, app_name=APP_NAME, session_service=session_service)
 
     print(f"Running meeting follow-up pipeline for: {recipient_email}\n")
     async for event in runner.run_async(
-        user_id="user",
+        user_id=USER_ID,
         session_id=session_id,
         new_message=types.Content(role="user", parts=[types.Part(text=raw_notes)]),
     ):
+        # state_delta contains the session state keys that changed in this event.
+        # We print intermediate results to observe the pipeline as it runs.
         if event.actions.state_delta:
             delta = event.actions.state_delta
             if "summary" in delta:
                 print(f"[SummaryAgent]\n{delta['summary']}\n")
             if "action_items" in delta:
                 print(f"[ActionItemAgent]\n{delta['action_items']}\n")
+        # The email composer is the last agent — its final response confirms the send.
         if event.is_final_response() and event.content and event.author == "EmailComposerAgent":
             print(f"[EmailComposerAgent] {event.content.parts[0].text}")
 
@@ -150,7 +168,7 @@ SAMPLE_NOTES = """
 Product sync 15/04/2026
 Attendees: Ana (PM), Bruno (Eng), Carla (Design), David (QA)
 
-We reviewed the Q2 roadmap. The checkout redesign is on track for May 1st.
+we reviewed the Q2 roadmap. The checkout redesign is on track for May 1st.
 Bruno mentioned the payment API integration is blocked on credentials from the vendor -
 he will follow up with them by Friday.
 Carla will share the final Figma mockups by Wednesday EOD.

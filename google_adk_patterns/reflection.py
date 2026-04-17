@@ -1,3 +1,13 @@
+"""
+Reflection Pattern — Google ADK
+Use case: Self-correcting content generation with a fact-check loop.
+
+Key concept: A LoopAgent keeps iterating sub-agents until a termination condition
+is met. Here a reviewer checks the draft and either approves (escalate=True, stops
+the loop) or asks a rewriter to fix it (loop continues).
+
+Pipeline: DraftWriter → [LoopAgent: FactChecker → Rewriter] (max MAX_ITERATIONS)
+"""
 from google.adk.agents import SequentialAgent, LlmAgent, LoopAgent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.runners import Runner
@@ -9,24 +19,43 @@ import asyncio
 from dotenv import load_dotenv
 load_dotenv()
 
+# APP_NAME groups all sessions and runs for this application.
+APP_NAME = "reflection_pipeline"
+
+# USER_ID identifies the person interacting with the agent.
+USER_ID = "medtiles"
+
+# Maximum number of review → rewrite cycles before the loop stops unconditionally.
 MAX_ITERATIONS = 2
 
-# Step 1: Generate the initial draft (runs once before the loop).
+
+# --- Step 1: Generator ---
+# Runs once at the start of the pipeline to produce the initial draft.
+# output_key="draft_text" saves the result into session state under that key —
+# downstream agents read it from state using {draft_text} interpolation.
 generator = LlmAgent(
     name="DraftWriter",
     description="Generates initial draft content on a given subject.",
     instruction="Write a short, informative paragraph about the user's subject.",
-    output_key="draft_text"
+    output_key="draft_text",
 )
 
-# Callback on the reviewer: exit the loop as soon as the draft is accurate,
-# so the rewriter doesn't run on an already-correct draft.
+
+# --- Callback: early-exit when the draft is already accurate ---
+# after_agent_callback runs after the agent's turn completes.
+# Setting actions.escalate = True tells the LoopAgent to stop immediately
+# instead of running the next sub-agent (the rewriter).
 def check_accuracy(callback_context: CallbackContext):
     review = callback_context.state.get("review_output", "")
     if "INACCURATE" not in review and "ACCURATE" in review:
+        # The draft is accurate — no rewrite needed; exit the loop early.
         callback_context.actions.escalate = True
 
-# Step 2a: Critique the current draft.
+
+# --- Step 2a: Reviewer ---
+# Reads the current draft from state and classifies it as ACCURATE or INACCURATE.
+# The after_agent_callback fires immediately after this agent writes its output —
+# if the draft is good, it escalates (stops the loop) before the rewriter runs.
 reviewer = LlmAgent(
     name="FactChecker",
     description="Reviews a draft for factual accuracy and signals when it is correct.",
@@ -39,11 +68,13 @@ reviewer = LlmAgent(
        - Remaining lines: a clear explanation. If INACCURATE, cite each specific issue.
     """,
     output_key="review_output",
-    after_agent_callback=check_accuracy
+    after_agent_callback=check_accuracy,
 )
 
-# Step 2b: Revise the draft based on the critique.
+
+# --- Step 2b: Rewriter ---
 # Only runs when the reviewer found issues (i.e. did NOT escalate).
+# Overwrites draft_text so the next reviewer pass sees the corrected version.
 rewriter = LlmAgent(
     name="Rewriter",
     description="Rewrites a draft to fix factual issues identified by the reviewer.",
@@ -54,45 +85,54 @@ rewriter = LlmAgent(
     3. Rewrite the paragraph to fix every identified factual issue.
     4. Output only the corrected paragraph — no preamble, no explanation.
     """,
-    output_key="draft_text"  # Overwrites the draft for the next reviewer pass.
+    output_key="draft_text",  # Overwrites the draft so the next reviewer pass sees the fix.
 )
 
-# The reflection loop: reviewer → (escalate if ACCURATE) → rewriter → repeat.
+
+# --- Step 3: Reflection loop ---
+# LoopAgent runs its sub_agents in sequence, then repeats from the first sub-agent.
+# The loop ends when: escalate=True is set (accurate draft) OR max_iterations is reached.
 reflection_loop = LoopAgent(
     name="ReflectionLoop",
     sub_agents=[reviewer, rewriter],
-    max_iterations=MAX_ITERATIONS
+    max_iterations=MAX_ITERATIONS,
 )
 
-# Full pipeline: generate once, then reflect until accurate.
+
+# --- Step 4: Full pipeline ---
+# SequentialAgent runs sub_agents one after another in order.
+# generate first, then enter the reflect-until-accurate loop.
 reflection_pipeline = SequentialAgent(
     name="ReflectionPipeline",
-    sub_agents=[generator, reflection_loop]
+    sub_agents=[generator, reflection_loop],
 )
 
 
 async def run_pipeline(runner: Runner, request: str):
+    """Runs the reflection pipeline and prints state updates as the loop progresses."""
     print(f"\n--- Running Reflection Pipeline ---")
     print(f"Input: '{request}'\n")
 
-    user_id = "user"
     session_id = str(uuid.uuid4())
 
+    # runner.session_service and runner.app_name are set when the runner is created —
+    # accessing them here avoids duplicating APP_NAME across functions.
     await runner.session_service.create_session(
         app_name=runner.app_name,
-        user_id=user_id,
-        session_id=session_id
+        user_id=USER_ID,
+        session_id=session_id,
     )
 
     async for event in runner.run_async(
-        user_id=user_id,
+        user_id=USER_ID,
         session_id=session_id,
         new_message=types.Content(
-            role='user',
-            parts=[types.Part(text=request)]
+            role="user",
+            parts=[types.Part(text=request)],
         ),
     ):
-        # Print intermediate state updates so we can follow the loop.
+        # state_delta contains the session state keys that changed in this event.
+        # We print them to observe the reflection loop in action.
         if event.actions.state_delta:
             delta = event.actions.state_delta
             if "draft_text" in delta:
@@ -102,14 +142,15 @@ async def run_pipeline(runner: Runner, request: str):
 
 
 async def main():
+    # Create the session service and runner once; pass the runner to run_pipeline.
     session_service = InMemorySessionService()
     runner = Runner(
         agent=reflection_pipeline,
         session_service=session_service,
-        app_name="ReflectionApp"
+        app_name=APP_NAME,
     )
 
-    # Deliberately wrong facts to exercise the reflection loop.
+    # Deliberately wrong facts so the reflection loop has something to correct.
     await run_pipeline(runner, "The Eiffel Tower is located in Berlin.")
 
 
