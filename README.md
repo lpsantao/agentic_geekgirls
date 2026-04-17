@@ -3,7 +3,7 @@
 Workshop materials from **Geek Girls Portugal Conference 2026** · Porto Business School · April 2026
 
 A hands-on introduction to agentic AI systems that can reason, plan, and act.  
-Based on [*Agentic Design Patterns: A Hands-On Guide to Building Intelligent Systems*](https://www.amazon.com/) by **Antonio Gulli**.
+Based on [*Agentic Design Patterns: A Hands-On Guide to Building Intelligent Systems*](https://link.springer.com/book/10.1007/978-3-032-01402-3) by **Antonio Gulli**.
 
 ---
 
