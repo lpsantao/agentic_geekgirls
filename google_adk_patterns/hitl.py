@@ -17,7 +17,11 @@ from google.genai import types
 from dotenv import load_dotenv
 load_dotenv()
 
+# APP_NAME groups all sessions and runs for this application.
 APP_NAME = "email_hitl"
+
+# USER_ID identifies the person interacting with the agent.
+USER_ID = "medtiles"
 
 
 # --- Step 1: Initial drafter — reads brief from state via {brief} interpolation ---
@@ -50,10 +54,13 @@ reviser = LlmAgent(
 
 
 # --- Step 2a: Human review — pauses, shows draft, gets approval or feedback ---
+# BaseAgent is the escape hatch for logic that can't be expressed as an LLM prompt.
+# Override _run_async_impl and yield Event objects to communicate with the runner.
 class HumanReviewAgent(BaseAgent):
     """Interrupts the loop to show the current draft and collect human input."""
 
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
+        # Read the current draft and revision count from session state.
         draft = ctx.session.state.get("draft", "")
         revision = ctx.session.state.get("revision", 0)
 
@@ -67,11 +74,14 @@ class HumanReviewAgent(BaseAgent):
 
         actions = EventActions()
         if feedback.lower() == "send":
+            # escalate=True tells the LoopAgent to stop iterating immediately.
             actions.escalate = True
             actions.state_delta = {"approved": True}
         else:
+            # Save feedback to state so the reviser can read it with {feedback}.
             actions.state_delta = {"feedback": feedback, "revision": revision + 1}
 
+        # Yield a single Event — the runner processes it and continues the loop.
         yield Event(author=self.name, actions=actions)
 
 
@@ -93,9 +103,11 @@ async def run(brief: str):
     session_service = InMemorySessionService()
     session_id = str(uuid.uuid4())
 
+    # Pre-populate state so agents can reference {brief}, {draft}, etc. in instructions.
+    # Setting draft/feedback/revision to empty defaults avoids KeyErrors on first pass.
     await session_service.create_session(
         app_name=APP_NAME,
-        user_id="user",
+        user_id=USER_ID,
         session_id=session_id,
         state={"brief": brief, "draft": "", "feedback": "", "revision": 0},
     )
@@ -105,15 +117,15 @@ async def run(brief: str):
     print(f"\n Brief: {brief}\n")
 
     async for _ in runner.run_async(
-        user_id="user",
+        user_id=USER_ID,
         session_id=session_id,
         new_message=types.Content(role="user", parts=[types.Part(text=brief)]),
     ):
-        pass  # HumanReviewAgent handles all I/O inline
+        pass  # HumanReviewAgent handles all I/O inline via input(); nothing to do here.
 
-    # Pipeline is done — check final state
+    # Pipeline is done — read the final state to check approval and print the result.
     state = (await session_service.get_session(
-        app_name=APP_NAME, user_id="user", session_id=session_id
+        app_name=APP_NAME, user_id=USER_ID, session_id=session_id
     )).state
 
     if state.get("approved"):
