@@ -7,9 +7,23 @@ Based on [*Agentic Design Patterns: A Hands-On Guide to Building Intelligent Sys
 
 ---
 
-## Patterns
+## Implemented Patterns
 
-There is a total of 29 patterns, grouped into categories:
+Each pattern is available in two frameworks — Google ADK and LangGraph — so you can compare approaches side by side.
+
+| Pattern | Google ADK | LangGraph |
+|---|---|---|
+| Prompt Chaining | [google_adk_patterns/prompt_chaining.py](google_adk_patterns/prompt_chaining.py) | [langgraph_patterns/prompt_chaining.py](langgraph_patterns/prompt_chaining.py) |
+| Routing | [google_adk_patterns/routing.py](google_adk_patterns/routing.py) | [langgraph_patterns/routing.py](langgraph_patterns/routing.py) |
+| Tool Use | [google_adk_patterns/tool_use.py](google_adk_patterns/tool_use.py) | [langgraph_patterns/tool_use.py](langgraph_patterns/tool_use.py) |
+| Reflection | [google_adk_patterns/reflection.py](google_adk_patterns/reflection.py) | [langgraph_patterns/reflection.py](langgraph_patterns/reflection.py) |
+| Multi-Agent | [google_adk_patterns/multi_agent.py](google_adk_patterns/multi_agent.py) | [langgraph_patterns/multi_agent.py](langgraph_patterns/multi_agent.py) |
+| Human-in-the-Loop | [google_adk_patterns/hitl.py](google_adk_patterns/hitl.py) | [langgraph_patterns/hitl.py](langgraph_patterns/hitl.py) |
+| Guardrails and Safety | [google_adk_patterns/guardrails.py](google_adk_patterns/guardrails.py) | [langgraph_patterns/guardrails.py](langgraph_patterns/guardrails.py) |
+
+---
+
+## All 29 Patterns
 
 ### Core Patterns
 - Prompt Chaining
@@ -51,11 +65,10 @@ There is a total of 29 patterns, grouped into categories:
 - Spec-First Agent
 
 ---
+
 ## Pattern Relationships
 
-The following diagram illustrates how different agentic patterns often connect and rely on each other. This provides a high-level view of the ecosystem. Source: [https://github.com/zeljkoavramovic/agentic-design-patterns/tree/main]
-
-
+The following diagram illustrates how different agentic patterns often connect and rely on each other. Source: [https://github.com/zeljkoavramovic/agentic-design-patterns/tree/main]
 
 ```mermaid
 graph LR
@@ -119,7 +132,6 @@ graph LR
     P16 -- "provides facts for" --> P6
     P16 -- "provides facts for" --> P17
 
-    %% New Connections
     P23 -- "is a form of" --> P19
     P25 -- "relies on" --> P23
     P25 -- "requires" --> P26
@@ -127,7 +139,6 @@ graph LR
     P24 -- "is an evolution of" --> P3
     P5 -- "is used by" --> P23
 
-    %% Connections for New Patterns
     P26 -- "supports" --> P27
     P26 -- "supports" --> P28
     P5 -- "evolves to" --> P27
@@ -135,7 +146,6 @@ graph LR
     P18 -- "is a form of" --> P27
     P5 -- "extended by" --> P28
     P19 -- "enforces" --> P29
-
 ```
 
 ---
@@ -148,7 +158,33 @@ cd agentic_geekgirls
 pip install -r requirements.txt
 ```
 
-Each pattern lives in its own folder with a standalone example you can run and modify.
+Copy the env template and fill in your API keys:
+
+```bash
+cp .env_template .env
+```
+
+| Variable | Where to get it |
+|---|---|
+| `GOOGLE_API_KEY` | [Google AI Studio](https://aistudio.google.com/app/apikey) |
+| `OPENAI_API_KEY` | [OpenAI Platform](https://platform.openai.com/api-keys) |
+
+Run any pattern directly, e.g.:
+
+```bash
+python google_adk_patterns/prompt_chaining.py
+python langgraph_patterns/prompt_chaining.py
+```
+
+### Gmail Setup (Multi-Agent pattern only)
+
+The `multi_agent.py` examples send real emails via the Gmail API and require a one-time OAuth setup:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → enable the **Gmail API**
+2. Create **OAuth 2.0 Desktop** credentials and download as `credentials.json` into the project root
+3. Run the script once — a browser window will open for consent and `token.pickle` will be created automatically
+
+> `credentials.json` and `token.pickle` are gitignored and should never be committed.
 
 ---
 
