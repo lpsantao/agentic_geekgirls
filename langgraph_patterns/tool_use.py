@@ -11,9 +11,9 @@ load_dotenv()
 
 try:
     llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0)
-    print(f"✅ Language model initialized: {llm.model}")
+    print(f"Language model initialized: {llm.model}")
 except Exception as e:
-    print(f"🛑 Error initializing language model: {e}")
+    print(f"Error initializing language model: {e}")
     llm = None
 
 
@@ -49,10 +49,10 @@ if llm:
         print(f"\n--- 🏃 Running Agent with Query: '{query}' ---")
         try:
             response = await agent.ainvoke({"messages": [{"role": "user", "content": query}]})
-            print("\n--- ✅ Final Agent Response ---")
+            print("\n---Final Agent Response ---")
             print(response["messages"][-1].content)
         except Exception as e:
-            print(f"\n🛑 An error occurred during agent execution: {e}")
+            print(f"\n An error occurred during agent execution: {e}")
 
     async def main():
         """Runs all agent queries concurrently."""
